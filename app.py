@@ -50,8 +50,10 @@ def logout():
 def index():
     ssid, password = read_hotspot_settings()
     hostname = read_hostname()
-    logging.debug(f"SSID: {ssid}, Password: {password}, Hostname: {hostname}")  # Protokolliere die gelesenen Werte
-    return render_template('index.html', ssid=ssid, password=password, hostname=hostname)
+    edge_key, edge_secret, edge_db_password, cloud_rpc_host, spring_datasource_url = read_tb_edge_conf()
+    access_token = read_env_file()
+    logging.debug(f"SSID: {ssid}, Password: {password}, Hostname: {hostname}, EDGE Key: {edge_key}, EDGE Secret: {edge_secret}, EDGE DB Password: {edge_db_password}, CLOUD RPC Host: {cloud_rpc_host}, SPRING DATASOURCE URL: {spring_datasource_url}, Access Token: {access_token}")  # Protokolliere die gelesenen Werte
+    return render_template('index.html', ssid=ssid, password=password, hostname=hostname, edge_key=edge_key, edge_secret=edge_secret, edge_db_password=edge_db_password, cloud_rpc_host=cloud_rpc_host, spring_datasource_url=spring_datasource_url, access_token=access_token)
 
 @app.route('/update_settings', methods=['POST'])
 @login_required
@@ -59,8 +61,16 @@ def update_settings():
     ssid = request.form['ssid']
     password = request.form['password']
     hostname = request.form['hostname']
+    edge_key = request.form['edge_key']
+    edge_secret = request.form['edge_secret']
+    edge_db_password = request.form['edge_db_password']
+    cloud_rpc_host = request.form['cloud_rpc_host']
+    spring_datasource_url = request.form['spring_datasource_url']
+    access_token = request.form['access_token']
     update_hotspot_settings(ssid, password)
     update_hostname(hostname)
+    update_tb_edge_conf(edge_key, edge_secret, edge_db_password, cloud_rpc_host, spring_datasource_url)
+    update_env_file(access_token)
     return redirect(url_for('index'))
 
 def read_hotspot_settings():
@@ -144,6 +154,85 @@ def update_hostname(hostname):
         os.system('sudo hostnamectl set-hostname ' + hostname)
     except Exception as e:
         logging.error(f'Error updating hostname: {e}')
+
+def read_tb_edge_conf():
+    config_path = '/etc/tb-edge/conf/tb-edge.conf'
+    edge_key = ''
+    edge_secret = ''
+    edge_db_password = ''
+    cloud_rpc_host = ''
+    spring_datasource_url = ''
+    try:
+        with open(config_path, 'r') as f:
+            for line in f:
+                logging.debug(f"Reading line: {line.strip()}")  # Protokolliere jede Zeile
+                if line.strip().startswith('export CLOUD_ROUTING_KEY='):
+                    edge_key = line.split('=')[1].strip().strip('"')
+                    logging.debug(f"Found EDGE Key: {edge_key}")  # Protokolliere gefundenen EDGE Key
+                if line.strip().startswith('export CLOUD_ROUTING_SECRET='):
+                    edge_secret = line.split('=')[1].strip().strip('"')
+                    logging.debug(f"Found EDGE Secret: {edge_secret}")  # Protokolliere gefundenes EDGE Secret
+                if line.strip().startswith('export SPRING_DATASOURCE_PASSWORD='):
+                    edge_db_password = line.split('=')[1].strip().strip('"')
+                    logging.debug(f"Found EDGE DB Password: {edge_db_password}")  # Protokolliere gefundenes EDGE DB Password
+                if line.strip().startswith('export CLOUD_RPC_HOST='):
+                    cloud_rpc_host = line.split('=')[1].strip().strip('"')
+                    logging.debug(f"Found CLOUD RPC Host: {cloud_rpc_host}")  # Protokolliere gefundenen CLOUD RPC Host
+                if line.strip().startswith('export SPRING_DATASOURCE_URL='):
+                    spring_datasource_url = line.split('=')[1].strip().strip('"')
+                    logging.debug(f"Found SPRING DATASOURCE URL: {spring_datasource_url}")  # Protokolliere gefundene SPRING DATASOURCE URL
+    except Exception as e:
+        logging.error(f'Error reading TB Edge configuration: {e}')
+    return edge_key, edge_secret, edge_db_password, cloud_rpc_host, spring_datasource_url
+
+def update_tb_edge_conf(edge_key, edge_secret, edge_db_password, cloud_rpc_host, spring_datasource_url):
+    config_path = '/etc/tb-edge/conf/tb-edge.conf'
+    try:
+        with open(config_path, 'r') as f:
+            lines = f.readlines()
+
+        new_lines = []
+        for line in lines:
+            if line.strip().startswith('export CLOUD_ROUTING_KEY='):
+                new_lines.append(f'export CLOUD_ROUTING_KEY="{edge_key}"\n')
+            elif line.strip().startswith('export CLOUD_ROUTING_SECRET='):
+                new_lines.append(f'export CLOUD_ROUTING_SECRET="{edge_secret}"\n')
+            elif line.strip().startswith('export SPRING_DATASOURCE_PASSWORD='):
+                new_lines.append(f'export SPRING_DATASOURCE_PASSWORD="{edge_db_password}"\n')
+            elif line.strip().startswith('export CLOUD_RPC_HOST='):
+                new_lines.append(f'export CLOUD_RPC_HOST="{cloud_rpc_host}"\n')
+            elif line.strip().startswith('export SPRING_DATASOURCE_URL='):
+                new_lines.append(f'export SPRING_DATASOURCE_URL="{spring_datasource_url}"\n')
+            else:
+                new_lines.append(line)
+
+        with open(config_path, 'w') as f:
+            f.writelines(new_lines)
+        logging.debug(f'Updated TB Edge configuration')
+    except Exception as e:
+        logging.error(f'Error updating TB Edge configuration: {e}')
+
+def read_env_file():
+    env_file_path = '/etc/owipex/.env'
+    access_token = ''
+    try:
+        with open(env_file_path, 'r') as f:
+            for line in f:
+                if line.strip().startswith('THINGSBOARD_ACCESS_TOKEN='):
+                    access_token = line.split('=')[1].strip()
+                    logging.debug(f"Found Access Token: {access_token}")
+    except Exception as e:
+        logging.error(f'Error reading .env file: {e}')
+    return access_token
+
+def update_env_file(access_token):
+    env_file_path = '/etc/owipex/.env'
+    try:
+        with open(env_file_path, 'w') as f:
+            f.write(f'THINGSBOARD_ACCESS_TOKEN={access_token}\n')
+        logging.debug(f'Updated .env file')
+    except Exception as e:
+        logging.error(f'Error updating .env file: {e}')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
