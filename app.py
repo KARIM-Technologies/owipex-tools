@@ -14,7 +14,7 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 # Dummy Benutzer
-users = {'admin': {'password': 'password123'}}
+users = {'owipex_adm': {'password': 'OW!p3x?'}}
 
 class User(UserMixin):
     def __init__(self, id):
