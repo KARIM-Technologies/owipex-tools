@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi Hotspot Einstellungen</title>
+</head>
+<body>
+    <h1>WiFi Hotspot Einstellungen</h1>
+    <form action="/update_settings" method="post">
+        <label for="ssid">SSID:</label>
+        <input type="text" id="ssid" name="ssid" value="{{ ssid }}"><br><br>
+        <label for="password">Passwort:</label>
+        <input type="password" id="password" name="password" value="{{ password }}"><br><br>
+        <label for="hostname">Hostname:</label>
+        <input type="text" id="hostname" name="hostname" value="{{ hostname }}"><br><br>
+        <input type="submit" value="Speichern">
+    </form>
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>
